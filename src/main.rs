@@ -10,7 +10,7 @@ use std::time::Duration;
 fn command_matches() -> clap::ArgMatches {
     command!()
         .name("Temperature Checker")
-        .version("1.0.1")
+        .version("1.0.2")
         .about("A useful Rust script to keep an eye on device's temperatures. It includes information about the CPU, each CORE and the GPU.")
         .arg(
             Arg::new("time")
@@ -70,21 +70,21 @@ fn get_temps(map: &mut IndexMap<String, f64>) -> Result<(), Box<dyn Error>> {
 
     let temps = String::from_utf8_lossy(&output.stdout);
     let temps: Value = serde_json::from_str(&temps)?;
+    
+    handle_temps(&temps, map);
 
     let nvidia = Command::new("nvidia-smi")
         .args(["--query-gpu=temperature.gpu", "--format=csv,noheader"])
-        .output()?;
+        .output();
 
-    if !nvidia.status.success() {
-        return Err(Box::from("Failed to fetch NVIDIA temperatures"));
+    if let Ok(nvidia) = nvidia {
+        let gpu_temp = String::from_utf8_lossy(&nvidia.stdout)
+            .trim()
+            .parse::<f64>()
+            .unwrap_or(0.0);
+    
+        map.insert("GPU\t(°C)".to_string(), gpu_temp);
     }
-    let gpu_temp = String::from_utf8_lossy(&nvidia.stdout)
-        .trim()
-        .parse::<f64>()
-        .unwrap_or(0.0);
-
-    handle_temps(&temps, map);
-    map.insert("GPU\t(°C)".to_string(), gpu_temp);
 
     Ok(())
 }
